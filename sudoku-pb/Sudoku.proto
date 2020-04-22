@@ -1,0 +1,135 @@
+syntax = "proto3";
+
+option java_package = "com.domo.game.base.protobuf";
+option java_outer_classname = "SudokuPB";
+option csharp_namespace = "DoMobile.Game";
+
+
+/*
+统一说明
+	·包格式：包长度(2字节) + 消息号(2字节) + 消息体
+	·包长度描述的是消息号+消息体的字节长度，即一个完整的数据包最小长度为4
+	
+	·每个消息结构的注释后面数字为消息号
+	·客户端发请求消息和接收服务器响应消息是同一个消息号
+	·所有请求必定带有对应的响应，响应结构里面必定有result字段，描述这个请求是否成功处理，0=成功，其它数字表示失败的情况，后续注释会写具体有哪些失败的情况给对应的错误码
+	·消息名Req结尾表示是客户端发的消息结构，Res结尾是服务器的响应消息结构，Notify开头一般是服务端主动给客户端发送的通知消息，其它就是普通的pb结构而已
+	·如果请求不带任何参数，例如心跳，那么只需要发消息号就好，没有消息体。对应的服务器响应消息还会有的，不会没有。
+*/
+
+
+//登陆请求 - 100
+message LoginReq {
+	string token = 1;
+	repeated int32 themeIdList = 2;		//支持的主题id列表
+	repeated int32 skinIdList = 3;		//支持的皮肤id列表
+	bool isReEnterBattle = 4;			//客户端是否重试重连进入战斗（用于判断是否要发送110消息）
+}
+message LoginRes {
+	int32 result = 1;	//1=token为空，2=出现并发登陆的极端情况，此次登陆无效，3=调用web接口报错(超时，无响应之类)，4=web接口响应状态码非200，5=主题id列表没有值，6=皮肤id列表没有值
+						//7=该账号已在其它地方登陆
+	bool isBattleing = 2; //是否在战斗中，是的话随后会收到104或110消息
+}
+
+//心跳请求 - 101
+//没有请求数据，只发消息号就好，服务器判断超过30秒没有收到客户端的消息，就判定为掉线处理了，客户端心跳包可以定时5秒发一次
+message HeartRes {
+	int32 result = 1;	//这个接口的result必定为0
+	int32 serverTime = 2;	//服务器时间（秒）
+}
+
+
+//匹配请求 - 102
+message MatchRes {
+	int32 result = 1;	//1=当前在战斗中，2=当前正在匹配中
+}
+
+
+//通知匹配结果 - 103
+message NotifyMatchResult {
+	int32 result = 1; //0=匹配成功，有下面的玩家信息，1=调用web接口报错(获取战斗初始化数据接口超时，无响应之类)，2=web接口响应状态码非200
+	PlayerInfo playerInfo = 2;	//匹配到的玩家信息
+}
+
+//玩家数据结构
+message PlayerInfo{
+	int32 playerId = 1;		//玩家id
+	string nickName = 2;	//昵称
+	string icon = 3;		//头像
+	int32 lv = 4;			//段位
+}
+
+
+//通知进入战斗 - 104
+message NotifyEnterBattle {
+	int32 themeId = 1;		//主题id
+	int32 skinIId = 2;		//皮肤id
+	int32 difficulty = 3;	//难度（例如3 = 3*3，6 = 6*6）
+	PlayerInfo playerInfo = 4;	//对手信息
+	int32 rivalRate = 5;	//对手的进度（填写数量）
+	map<int32, int32> initGridMap = 6;	//初始网格数据，key=格子id，value=初始数据
+	map<int32, int32> gridMap = 7;	//我填入的网格数据，key=格子id，value=填入数据
+	map<int32, int32> fullGridMap = 8;	//完整的网格数据
+	int32 keepTime = 9;	//游戏持续时间（单位秒）
+	bool isFirstEnter = 10;	//是否本局第一次进入战斗
+}
+
+
+//填入格子数据请求 - 105
+message WriteGridReq {
+	int32 gridId = 1;	//格子id
+	int32 gridData = 2;	//填入数据
+}
+message WriteGridRes {
+	int32 result = 1;	//1=没有在战斗中，2=格子id不合法，4=填入数据不合法，5=格子id是初始格子，6=战斗已结束
+	int32 gridId = 2;	//格子id
+	int32 gridData = 3;	//填入数据
+}
+
+
+//通知更新对方进度 - 106
+message NotifyUpdateRate {
+	int32 rate = 1;		//最新进度
+	bool isExistError = 2;	//全部填完的情况下告知是否有错误
+}
+
+
+//清除格子数据请求 - 107
+message ClearGridReq {
+	int32 gridId = 1;	//格子id，0表示全清
+}
+message ClearGridRes {
+	int32 result = 1;	//1=没有在战斗中，2=格子id不合法，3=格子位置没有数据，4=格子id是初始格子，5=战斗已结束
+	int32 gridId = 2;	//格子id，0表示全清
+}
+
+
+//发送表情请求 - 108
+message SendFaceReq {
+	int32 faceId = 1;	//表情id
+}
+message SendFaceRes {
+	int32 result = 1;	//0成功，其它都属于失败情况
+}
+
+
+//通知对方给我发了个表情 - 109
+message NotifyReceiveFace {
+	int32 faceId = 1;	//表情id
+}
+
+
+//通知游戏结束 - 110
+message NotifyGameOver {
+	int32 result = 1;	//0=流局，1=胜利，2=失败
+	string shareUrl = 2; //分享url
+	int32 finishTime = 3;	//完成时间
+}
+
+//通知服务器停机维护 - 111
+
+
+//取消匹配 - 112
+message CancelMatchRes {
+	int32 result = 1;	//0成功，其它都属于失败情况
+}

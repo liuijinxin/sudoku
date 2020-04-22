@@ -1,0 +1,622 @@
+swagger: '2.0'
+info:
+  description: 数独客户端API
+  version: 1.0.0
+  title: 数独客户端API
+  termsOfService: 'https://www.domobile.com/best/privacy.html'
+  contact:
+    email: apiteam@swagger.io
+host: localhost:7002
+basePath: /v1
+tags:
+  - name: auth
+    description: 用户认证
+  - name: user
+    description: 用户
+  - name: native
+    description: 经典/趣味数独
+  - name: dailyChallenge
+    description: 每日挑战
+  - name: rankingGame
+    description: 段位赛
+  - name: fight
+    description: 对战相关
+schemes:
+  - http
+securityDefinitions:
+  JwtAuth:
+    type: apiKey
+    in: header
+    name: Authorization
+  GameApiKey:
+    type: apiKey
+    in: header
+    name: X-GAME-API-KEY
+    description: 游戏服务请求的安全验证
+parameters:
+  startAfter:
+    in: query
+    name: start_after
+    type: integer
+    description: 数据起点id
+  limit:
+    in: query
+    name: linit
+    type: integer
+    description: 每页个数
+paths:
+  /token:
+    get:
+      summary: 获取token
+      description: 获取JWT Token，包含用户id、用户角色，过期时间等信息
+      tags:
+        - auth
+      parameters:
+        - in: query
+          name: type
+          description: 登录类型 <br>`facebook` 脸书<br>`google` 谷歌<br>`password` 账号<br>`tourist` 游客
+          type: string
+          required: true
+          enum:
+            - facebook
+            - google
+            - tourist
+        - in: query
+          name: access_token
+          type: string
+          description: oauth2 access token 
+        - in: header
+          name: uuid
+          type: string
+          description: 游客账号uuid，为空则是新建一个游客账号
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/TokenInfo'
+  /binding:
+    get:
+      summary: 绑定第3方账号，成功后会重新返回token
+      tags: 
+        - auth
+      security: 
+        - JwtAuth: []
+      parameters: 
+        - in: query
+          name: type
+          description: 账号类型 <br>`facebook` 脸书<br>`google` 谷歌
+          required: true
+          type: string
+          enum: 
+            - facebook
+            - google
+        - in: query
+          name: access_token
+          type: string
+          description: oauth2 access token
+          required: true
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: '#/definitions/TokenInfo'
+  /my-info:
+    get:
+      summary: 获取我的信息
+      tags:
+        - user
+      security:
+        - JwtAuth: []
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/MyInfo'
+  /my-info/avatar:
+    patch:
+      summary: 上传修改头像
+      consumes:
+        - multipart/form-data
+      parameters:
+        - in: formData
+          name: pic
+          type: file
+          required: true
+      tags:
+        - user
+      security:
+        - JwtAuth: []
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: object
+            properties:
+              avatar:
+                type: string
+  /my-info/nickname:
+    patch:
+      summary: 更改昵称
+      tags:
+        - user
+      security:
+        - JwtAuth: []
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              nickname:
+                type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: object
+            properties:
+              nickname:
+                type: string
+  /native:
+    post:
+      summary: 经典数独结果上传，会返回是否破纪录
+      tags: 
+        - native
+      security: 
+        - JwtAuth: []
+      parameters: 
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: '#/definitions/ResultPost'
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              isBest:
+                type: boolean
+                description: 是否破纪录
+              minDuration:
+                type: integer
+                description: 最短时间
+  /native-report:
+    post:
+      summary: 经典数独结果上报，可批量
+      description: 一般上报之前上传失败的数据,当uuid在数据库中有时，会主动过滤掉这个数据，不会返回错误，
+      tags: 
+        - native
+      security: 
+        - JwtAuth: []
+      parameters: 
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 5
+            items:
+              $ref: '#/definitions/ResultPost'
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              reportCount:
+                type: integer
+                description: 实际入库的个数
+  /daily-challenges:
+    get:
+      summary: 获取月份挑战的简短信息(是否挑战完成)
+      parameters: 
+        - in: query
+          name: month
+          type: string
+          description: 年月 `YYYYMM`
+          required: true
+      tags: 
+        - dailyChallenge
+      security: 
+        - JwtAuth: []
+      responses:
+        200:
+          description: OK
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                date:
+                  type: string
+                  description: 日期
+                completedTime:
+                  type: string
+                  description: UTC +0 时间，如无则未完成
+  /daily-challenges/{date}:
+    parameters: 
+      - in: path
+        name: date
+        type: string
+        required: true
+        description: 日期 `YYYYMMDD`
+    get:
+      summary: 获取某个日期的挑战
+      tags: 
+        - dailyChallenge
+      security: 
+        - JwtAuth: []
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: '#/definitions/DailyChallenge'
+  /daily-challenges/{date}/result:
+    parameters: 
+      - in: path
+        name: date
+        type: string
+        required: true
+        description: 日期 `YYYYMMDD`
+    post:
+      summary: 提交结果
+      tags: 
+        - dailyChallenge
+      security: 
+        - JwtAuth: []
+      parameters: 
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: '#/definitions/Result'
+      responses:
+        200:
+          description: OK
+  /ranking-game:
+    get:
+      summary: 获取当前时段段位赛信息
+      tags: 
+        - rankingGame
+      security: 
+        - JwtAuth: []
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: '#/definitions/RankingGame'
+  /ranking-games/{id}:
+    parameters: 
+      - in: path
+        name: id
+        description: 段位赛id
+        type: integer
+        required: true
+    get:
+      summary: 根据某个段位赛信息 
+      tags: 
+        - rankingGame
+      security: 
+        - JwtAuth: []
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: '#/definitions/RankingGame'
+  /ranking-games/{id}/result:
+    parameters: 
+      - in: path
+        name: id
+        description: 段位赛id
+        type: integer
+        required: true
+    post:
+      summary: 提交结果
+      tags: 
+        - rankingGame
+      security: 
+        - JwtAuth: []
+      parameters: 
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: '#/definitions/Result'
+      responses:
+        200:
+          description: OK
+  /leaderboards:
+    get:
+      summary: 段位赛榜单
+      tags: 
+        - rankingGame
+      security: 
+        - JwtAuth: []
+      parameters: 
+        - in: query
+          name: index
+          type: integer
+          description: 段位赛期数，如果为空则为当前时间的上一期
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: '#/definitions/Leaderboards'
+  /battle-init-data:
+    get:
+      summary: 获取对战初始数据
+      tags: 
+        - fight
+      security: 
+        - GameApiKey: []
+      parameters: 
+        - in: query
+          name: level
+          type: integer
+          description: 用户段位 0或null不需要机器人
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: '#/definitions/BattleInitData'
+  /battle-result:
+    post:
+      summary: 提交对战结果
+      parameters: 
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              userIdA:
+                type: integer
+                description: A用户id
+              userIdB:
+                type: integer
+                description: B用户id
+              result:
+                type: integer
+                description: 1 a赢 2 b赢 其他流局
+              useTime:
+                type: integer
+                description: 用时 单位秒
+      tags: 
+        - fight
+      security: 
+        - GameApiKey: []
+      responses:
+        200:
+          description: OK
+          schema:
+            type: object
+            properties:
+              shareUrl:
+                type: object
+                properties:
+                  userA:
+                    type: string
+                    description: 用户a分享url
+                  userB:
+                    type: string
+                    description: 用户b分享url
+definitions:
+  TokenInfo:
+    type: object
+    description: token信息
+    properties:
+      token:
+        type: string
+        description: JWT token  Bearer校验
+      firstLogin:
+        type: boolean
+        description: 是否是第一次登陆这个游戏
+  MyInfo:
+    type: object
+    description: 我的信息
+    properties:
+      id:
+        type: integer
+        description: 唯一标识
+      nickname:
+        type: string
+        description: 昵称
+      type:
+        type: string
+        description: 账号类型 facebook/password等
+      avatar:
+        type: string
+        description: 头像URL
+      gameCount:
+        type: integer
+        description: 总局数
+      dayCount:
+        type: integer
+        description: 游戏天数
+      fightRecord:
+        type: string
+        description: 对战战绩
+  Question:
+    type: object
+    description: 数独题目
+    properties:
+      type:
+        type: string
+        description: 题目类型  
+        enum: 
+          - 3x3
+          - 4x4
+          - 6x6
+          - simple
+          - medium
+          - hard
+          - expert
+      numbers:
+        type: array
+        description: 数字排布 3x3 数组长度为9 十位代表该位置的数字 个位代表是否显示   81代表该数字是8 并且显示
+        items:
+          type: integer
+  DrawPath:
+    description: 填数字的轨迹数组 <br>第0个为位置 <br>第1个填的数 <br>第2个为使用时间 单位秒
+    type: array
+    minLength: 3
+    maxLength: 3
+    items:
+      type: integer
+  ResultPost:
+    description: 经典数独上报类
+    type: object
+    properties:
+      uuid:
+        type: string
+        description: uuid 唯一标识，防止重复上报
+      question:
+        $ref: '#/definitions/Question'
+      result:
+        $ref: '#/definitions/Result'
+  Result:
+    description: 数独结果
+    type: object
+    properties:
+      useTime:
+        type: integer
+        description: 总用时
+      drawPath:
+        type: array
+        description: 轨迹
+        items:
+          $ref: '#/definitions/DrawPath'
+  DailyChallenge:
+    description: 每日挑战，result为空则未挑战
+    type: object
+    properties:
+      date:
+        type: string
+        description: 日期  唯一标识  格式 `YYYYMMDD`
+      question:
+        $ref: '#/definitions/Question'
+      result:
+        $ref: '#/definitions/Result'
+  RankingGame:
+    description: 段位赛信息
+    type: object
+    properties:
+      id:
+        type: integer
+        description: 唯一标识
+      index:
+        type: integer
+        description: 期数
+      startDate:
+        type: string
+        description: UTC时间,开始时间
+      endDate:
+        type: string
+        description: UTC时间 结束时间
+      playerCount:
+        type: integer
+        description: 参与人数
+      question:
+        $ref: '#/definitions/Question'
+      result:
+        $ref: '#/definitions/Result'
+  Leaderboards:
+    type: object
+    description: 段位赛榜单
+    properties:
+      index:
+        type: integer
+        description: 期数
+      myRankInfo:
+        type: object
+        description: 我的排名数据
+        properties:
+          useTime:
+            type: integer
+            description: 完成时长
+          ranking:
+            type: integer
+            description: 排名
+          level:
+            type: integer
+            description: 段位级别
+      leaders:
+        type: array
+        description: 排名前100的信息
+        items:
+          type: object
+          properties:
+            userId:
+              type: integer
+              description: 用户id
+            nickname:
+              type: string
+              description: 昵称
+            avatar:
+              type: string
+              description: 头像地址
+            useTime:
+              type: integer
+              description: 完成时长
+            ranking:
+              type: integer
+              description: 排名
+            level:
+              type: integer
+              description: 段位
+  BattleInitData:
+    type: object
+    description: 战斗开局初始数据
+    properties:
+      question:
+        $ref: '#/definitions/Question'
+      robot:
+        type: object
+        description: 机器人信息
+        properties:
+          userId:
+            type: integer
+            description: 用户id 机器人都是负数
+          nickname:
+            type: string
+            description: 昵称
+          avatar:
+            type: string
+            description: 头像URL
+          level:
+            type: integer
+            description: 段位
+  Pagination:
+    type: object
+    description: 分页信息，采用的是游标分页
+    properties:
+      startAfter:
+        type: integer
+        description: 数据起点id
+      limit:
+        type: integer
+        description: 页数
+      nextId:
+        type: integer
+        description: 下一页数据起点
+      count:
+        type: integer
+        description: 此次返回数据数量
+  ApiResponse:
+    type: object
+    description: 接口错误码
+    properties:
+      code:
+        type: integer
+        description: http状态码
+        format: int32
+      type:
+        type: string
+        description: 错误类型
+      message:
+        type: string
+        description: 错误信息

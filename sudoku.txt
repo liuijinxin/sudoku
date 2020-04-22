@@ -1,0 +1,34 @@
+https://apps.gitgit.top/sudoku/swagger/index.html 
+
+Authorization：Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwidHlwZSI6InRvdXJpc3QiLCJpYXQiOjE1NjYyODUwMDQsImV4cCI6MTU2ODg3NzAwNH0.txc5khG8v2Y7w6Ir0IBQhnx4zYUX11uKOgvOhcnUjns
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MywidHlwZSI6InRvdXJpc3QiLCJpYXQiOjE1NjYyODUyNjMsImV4cCI6MTU2ODg3NzI2M30.UJtjS7_qMaK4LD1dRACrrfTAEzFP7_HKYvONfduOzuQ
+
+X-GAME-API-KEY：domobile2017
+
+https://editor.swagger.io/
+
+
+写单元测试整体流程
+
+//匹配
+{msgCode: 102}
+
+//填写
+{msgCode: 105, pb: {gridId: 16, gridData: 4}}
+
+//撤销
+{msgCode: 107, pb: {gridId: 2}}
+
+//发表情
+{msgCode: 108, pb: {faceId: 2}}
+
+
+fullStr = 1：4，2：1，3：2，5：3，6：2，9：1，11：3，13：2，15：1，16：4，
+
+
+
+
+dart
+·http
+·socket
+·protobuf
